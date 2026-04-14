@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Quest Mega Prober: Physics & Hands</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+    <script src="https://unpkg.com/aframe-event-set-component@5.0.0/dist/aframe-event-set-component.min.js"></script>
+    
+    <script>
+      // Manual Reload Logic
+      AFRAME.registerComponent('gun-system', {
+        init: function () {
+          this.ammo = 10;
+          this.el.addEventListener('triggerdown', () => {
+            if (this.ammo > 0) {
+              this.shoot();
+              this.ammo--;
+            } else {
+              console.log("Out of ammo! Touch reload zone.");
+            }
+            this.updateHUD();
+          });
+          
+          // Reload collision check
+          this.el.addEventListener('collidestart', (e) => {
+            if (e.detail.targetEl.id === 'reload-box') {
+              this.ammo = 10;
+              this.updateHUD();
+            }
+          });
+        },
+        shoot: function () {
+          let bullet = document.createElement('a-sphere');
+          bullet.setAttribute('radius', '0.02');
+          bullet.setAttribute('color', 'yellow');
+          bullet.setAttribute('dynamic-body', 'mass: 0.1');
+          
+          let worldPos = new THREE.Vector3();
+          this.el.object3D.getWorldPosition(worldPos);
+          bullet.setAttribute('position', worldPos);
+          
+          this.el.sceneEl.appendChild(bullet);
+          let direction = new THREE.Vector3(0, 0, -1);
+          direction.applyQuaternion(this.el.object3D.getWorldQuaternion(new THREE.Quaternion()));
+          bullet.body.velocity.set(direction.x * 25, direction.y * 25, direction.z * 25);
+        },
+        updateHUD: function() {
+          document.querySelector('#ammo-display').setAttribute('value', `AMMO: ${this.ammo}/10`);
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <a-scene physics="gravity: -9.8; debug: false" webxr="optionalFeatures: passthrough, hand-tracking">
+      
+      <a-sky color="#000" opacity="0.4"></a-sky>
+      <a-light type="ambient" intensity="0.5"></a-light>
+      <a-light type="directional" position="1 1 1"></a-light>
+
+      <a-entity position="0 2 -2">
+        <a-text id="ammo-display" value="AMMO: 10/10" align="center" color="#00FF00" width="3"></a-text>
+        <a-text value="GRAB BLOCKS TO THROW\nTOUCH RED BOX TO RELOAD" position="0 -0.5 0" align="center" width="2" color="white"></a-text>
+      </a-entity>
+
+      <a-box id="reload-box" static-body position="0 0.8 -0.5" width="0.3" height="0.3" depth="0.3" color="red">
+        <a-text value="RELOAD" align="center" position="0 0 0.16" width="2"></a-text>
+      </a-box>
+
+      <a-box dynamic-body grabbable position="-0.5 1.2 -1" width="0.2" height="0.2" depth="0.2" color="blue"></a-box>
+      <a-box dynamic-body grabbable position="0.5 1.2 -1" width="0.2" height="0.2" depth="0.2" color="cyan"></a-box>
+
+      <a-plane static-body rotation="-90 0 0" width="20" height="20" color="#222" opacity="0.5"></a-plane>
+
+      <a-entity id="leftHand" hand-tracking-controls="hand: left" physics-collider static-body="shape: sphere; sphereRadius: 0.05"></a-entity>
+      <a-entity id="rightHand" hand-tracking-controls="hand: right" gun-system physics-collider static-body="shape: sphere; sphereRadius: 0.05"></a-entity>
+
+      <a-entity oculus-touch-controls="hand: left" physics-collider></a-entity>
+      <a-entity oculus-touch-controls="hand: right" gun-system physics-collider></a-entity>
+
+    </a-scene>
+  </body>
+</html>
