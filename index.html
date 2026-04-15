@@ -2,111 +2,98 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>A-Frame GTag Multiplayer</title>
+    <title>GTag Multiplayer Fixed</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.slim.js"></script>
     <script src="https://unpkg.com/networked-aframe@^0.12.0/dist/networked-aframe.min.js"></script>
-
+    
     <script>
-      // --- GORILLA MOVEMENT COMPONENT ---
       AFRAME.registerComponent('gorilla-locomotion', {
         init: function () {
-          this.velocity = new THREE.Vector3(0, 0, 0);
-          this.friction = 0.96; 
-          this.gravity = -0.008;
-          this.lastLeftPos = new THREE.Vector3();
-          this.lastRightPos = new THREE.Vector3();
+          this.velocity = new THREE.Vector3();
+          this.friction = 0.95;
+          this.gravity = -0.01;
           
-          // Reference hands
-          this.leftHand = document.getElementById('leftHand');
-          this.rightHand = document.getElementById('rightHand');
+          // Store previous positions to calculate velocity
+          this.prevL = new THREE.Vector3();
+          this.prevR = new THREE.Vector3();
+          
+          // Get references to hand entities
+          this.leftHand = document.querySelector('#leftHand');
+          this.rightHand = document.querySelector('#rightHand');
         },
 
         tick: function (time, delta) {
-          const playerPos = this.el.object3D.position;
-          
-          // Calculate movement for both hands
-          this.processHand(this.leftHand, this.lastLeftPos);
-          this.processHand(this.rightHand, this.lastRightPos);
+          if (!delta) return;
 
-          // Apply Gravity
+          const playerObj = this.el.object3D;
+          
+          // 1. Apply Physics (Gravity & Friction)
           this.velocity.y += this.gravity;
-          
-          // Apply Friction (Air Resistance)
           this.velocity.multiplyScalar(this.friction);
+          playerObj.position.add(this.velocity);
 
-          // Update Position
-          playerPos.add(this.velocity);
-
-          // Simple Floor Collision
-          if (playerPos.y < 0) {
-            playerPos.y = 0;
-            this.velocity.y = 0;
+          // 2. Floor Collision
+          if (playerObj.position.y <= 0) {
+            playerObj.position.y = 0;
+            this.velocity.y = Math.max(0, this.velocity.y);
           }
+
+          // 3. Hand Physics Logic
+          this.handleHand(this.leftHand, this.prevL);
+          this.handleHand(this.rightHand, this.prevR);
         },
 
-        processHand: function (handEl, lastPos) {
-          if (!handEl) return;
-          
-          const currentPos = new THREE.Vector3();
-          handEl.object3D.getWorldPosition(currentPos);
-          
-          // Movement vector since last frame
-          const deltaMove = new THREE.Vector3().copy(currentPos).sub(lastPos);
-          
-          // "Physics" Trigger: If hand moves downward quickly near the ground/objects
-          // We check if the hand is low enough to "hit" the floor
-          if (currentPos.y < 0.5 && deltaMove.y < 0) {
-            // Push player in opposite direction of hand movement
-            this.velocity.x -= deltaMove.x * 3.5;
-            this.velocity.z -= deltaMove.z * 3.5;
-            this.velocity.y += Math.abs(deltaMove.y) * 4.0; 
-          }
-          
-          lastPos.copy(currentPos);
-        }
-      });
+        handleHand: function (hand, prevPos) {
+          if (!hand) return;
 
-      // --- NETWORKING SETUP ---
-      // Define what data to sync (position and rotation)
-      NAF.schemas.add({
-        template: '#avatar-template',
-        components: ['position', 'rotation']
+          const currentPos = new THREE.Vector3();
+          hand.object3D.getWorldPosition(currentPos);
+
+          // Calculate how fast the hand moved
+          const impulse = new THREE.Vector3().copy(currentPos).sub(prevPos);
+
+          // If hand is near the floor and moving down fast
+          // Adjust 0.5 to match your "gorilla" arm length
+          if (currentPos.y < 0.6 && impulse.y < -0.01) {
+             // Push player AWAY from the hand movement
+             this.velocity.x -= impulse.x * 2;
+             this.velocity.z -= impulse.z * 2;
+             this.velocity.y += Math.abs(impulse.y) * 3;
+          }
+
+          prevPos.copy(currentPos);
+        }
       });
     </script>
   </head>
   <body>
-    <a-scene networked-scene="
-      room: gtag-demo-123;
-      debug: true;
-      adapter: wseasyrtc;
-    ">
+    <a-scene networked-scene="room: gtag_fixed; debug: true; adapter: wseasyrtc;">
       
       <a-assets>
         <template id="avatar-template">
           <a-entity>
-            <a-sphere class="head" scale="0.3 0.3 0.3" color="#633b21"></a-sphere>
-            <a-box class="body" position="0 -0.4 0" scale="0.4 0.6 0.3" color="#4a2c19"></a-box>
-            <a-sphere position="-0.1 0.05 0.25" scale="0.05 0.05 0.05" color="white"></a-sphere>
-            <a-sphere position="0.1 0.05 0.25" scale="0.05 0.05 0.05" color="white"></a-sphere>
+            <a-sphere scale="0.25 0.3 0.25" color="#4b2c20"></a-sphere>
+            <a-box position="0 -0.35 0" scale="0.4 0.5 0.2" color="#3d2319"></a-box>
           </a-entity>
         </template>
       </a-assets>
 
-      <a-sky color="#87CEEB"></a-sky>
-      <a-plane rotation="-90 0 0" width="100" height="100" color="#2e7d32"></a-plane>
+      <a-sky color="#6EBAEF"></a-sky>
+      <a-plane rotation="-90 0 0" width="100" height="100" color="#1b5e20"></a-plane>
       
-      <a-box position="-3 1 -5" color="#5d4037" width="2" height="2" depth="2"></a-box>
-      <a-box position="4 2 -8" color="#5d4037" width="3" height="4" depth="3"></a-box>
-      <a-cylinder position="0 3 -15" radius="2" height="6" color="#5d4037"></a-cylinder>
+      <a-box position="-2 0.5 -3" color="#5d4037"></a-box>
+      <a-box position="2 1 -5" scale="2 2 2" color="#5d4037"></a-box>
 
       <a-entity id="player" 
                 gorilla-locomotion
-                networked="template:#avatar-template; attachTemplateToLocal:false;">
+                networked="template:#avatar-template;attachTemplateToLocal:false;">
+        
         <a-entity camera position="0 1.6 0" look-controls></a-entity>
         
-        <a-entity id="leftHand" hand-controls="hand: left"></a-entity>
-        <a-entity id="rightHand" hand-controls="hand: right"></a-entity>
+        <a-entity id="leftHand" hand-controls="hand: left; handModelStyle: lowPoly; color: #4b2c20"></a-entity>
+        <a-entity id="rightHand" hand-controls="hand: right; handModelStyle: lowPoly; color: #4b2c20"></a-entity>
+      
       </a-entity>
 
     </a-scene>
